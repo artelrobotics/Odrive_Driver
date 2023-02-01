@@ -205,3 +205,6 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+add_executable(odom_differential_cpp src/odom_differential.cpp)
+target_link_libraries(odom_differential_cpp ${catkin_LIBRARIES})
+add_dependencies(odom_differential_cpp odrive_driver_generate_messages_cpp)
