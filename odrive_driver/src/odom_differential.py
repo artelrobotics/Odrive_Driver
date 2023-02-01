@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-import odrive
+#!/usr/bin/env python
+#import odrive
 import rospy
 from tf import TransformBroadcaster
 from geometry_msgs.msg import Twist, Quaternion, TransformStamped
@@ -9,14 +9,15 @@ import math
 import time
 class Odrive_Odometry():
 
-    def __init__(self) -> None:
-        self.publish_tf = rospy.get_param('publish_tf', default = True)
-        self.odom_frame = rospy.get_param('odom_frame', default = 'odom')
-        self.base_frame = rospy.get_param('base_frame', default = 'base_link')
-        self.wheelbase = rospy.get_param('wheelbase', default = 0.365)
-        self.radius = rospy.get_param('wheel_radius', default = 0.085)
-        self.ppr = rospy.get_param('ppr', default = 1024)
-        self.last_time = time.time()
+    def __init__(self):
+        self.publish_tf = rospy.get_param('~publish_tf', default = True)
+        self.odom_frame = rospy.get_param('~odom_frame', default = 'odom')
+        self.base_frame = rospy.get_param('~base_link', default = 'leo_bot/base_link')
+        self.odom_topic = rospy.get_param('~odom_topic', default = 'odometry')
+        self.wheelbase = rospy.get_param('~wheelbase', default = 0.365)
+        self.radius = rospy.get_param('~wheel_radius', default = 0.085)
+        self.ppr = rospy.get_param('~ppr', default = 1024)
+        self.last_time = rospy.Time.now()
         self.ticks_meter = (self.ppr * 4) / (2 * math.pi * self.radius)
         self.init = False
         self.enc_left = 0
@@ -26,7 +27,7 @@ class Odrive_Odometry():
         self.theta_final = 0
 
         rospy.Subscriber('shadow_counts', Channel_values, self.encoder_callback)
-        self.odom_pub = rospy.Publisher('odometry', Odometry, queue_size = 10)
+        self.odom_pub = rospy.Publisher(self.odom_topic, Odometry, queue_size = 10)
         
     def encoder_callback(self, msg):
         """ 
@@ -35,7 +36,7 @@ class Odrive_Odometry():
         publishes: Odometry topic and TF
         
         """
-        self.current_time = time.time() # getting current time in secs
+        self.current_time = rospy.Time.now() # getting current time in secs
         left = msg.left                 # left encoder tick counts 
         right = msg.right               # right encoder tick counts
         
@@ -58,7 +59,7 @@ class Odrive_Odometry():
         th = (d_right - d_left) / self.wheelbase
         
         # elapsed time or dt
-        elapsed = self.current_time - self.last_time
+        elapsed = self.current_time.to_sec() - self.last_time.to_sec()
         
         # calculation of velocity 
         dx = d / elapsed
@@ -82,7 +83,7 @@ class Odrive_Odometry():
         if(self.publish_tf):
             odom_trans = TransformStamped()
             odom_broadcaster = TransformBroadcaster()
-            odom_trans.header.stamp = rospy.Time.now()
+            odom_trans.header.stamp = self.current_time
             odom_trans.header.frame_id = self.odom_frame
             odom_trans.child_frame_id = self.base_frame
 
@@ -94,7 +95,8 @@ class Odrive_Odometry():
             odom_broadcaster.sendTransformMessage(odom_trans)
 
         odom = Odometry()
-        #odom.header.stamp = self.current_time
+        odom.header.stamp.nsecs = self.current_time.nsecs
+        odom.header.stamp.secs = self.current_time.secs
         odom.header.frame_id = self.odom_frame
 
         odom.pose.pose.position.x = self.x_final

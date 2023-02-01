@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.8
 import odrive
 import rospy
 from geometry_msgs.msg import Twist
@@ -8,6 +8,8 @@ from std_srvs.srv import SetBool, Empty,SetBoolResponse
 import time
 import math
 from odrive_driver.msg import Channel_values, Status
+import signal
+import sys
 
 class Odrive_Driver():
 
@@ -15,14 +17,14 @@ class Odrive_Driver():
         rospy.loginfo("Finding an odrive...")
         self.my_drive = odrive.find_any()
         rospy.loginfo("Succesfully found")
-        self.wheelbase = rospy.get_param('wheelbase', default = 0.365)
-        self.radius = rospy.get_param('wheel_radius', default = 0.085)
-        self.max_rpm = rospy.get_param('max_rpm', default = 260)
-        self.rate = rospy.get_param('frequency', default = 20)
-        rospy.Service('Odrive_reboot', Empty, handler=self.reboot)
+        self.wheelbase = rospy.get_param('~wheelbase', default = 0.365)
+        self.radius = rospy.get_param('~wheel_radius', default = 0.085)
+        self.max_rpm = rospy.get_param('~max_rpm', default = 260)
+        rospy.Service('odrive_reboot', Empty, handler=self.reboot)
+        rospy.Service('clear_errors', Empty, handler=self.clear_errors)
         rospy.Subscriber('cmd_vel', Twist, self.cmd_callback)
         self.shadow_counts = rospy.Publisher('shadow_counts', Channel_values, queue_size= 10)
-        self.status_pub = rospy.Publisher('status', Status, queue_size= 10)
+        self.status_pub = rospy.Publisher('driver/status', Status, queue_size= 10)
         self.counts = Channel_values()
         self.status = Status()
     def driver_status(self):
@@ -54,20 +56,52 @@ class Odrive_Driver():
             speed = (self.max_rpm / 60) * (speed / abs(speed))
         
         return speed
+
+    def shutdown_hook(self):
+        try:
+            self.my_drive.axis0.controller.input_vel = 0
+            self.my_drive.axis1.controller.input_vel = 0
+            rospy.logwarn("Shuting down on hook")
+            sys.exit(0)
+        except Exception as e:
+            rospy.logerr(e)
     
+    def signal_handler(self, num, frame):
+        try:
+            self.my_drive.axis0.controller.input_vel = 0
+            self.my_drive.axis1.controller.input_vel = 0
+            rospy.logwarn(f"Handle signal {num}")
+            sys.exit(0)
+        except Exception as e:
+            rospy.logerr(e)
+
     def reboot(self, command):
-        
-        return "Reboot"
-    
+        self.my_drive.reboot()
+
+    def clear_errors(self, command):
+        self.my_drive.clear_errors()
+
 if __name__ == '__main__':
     # Initialize Node 
     rospy.init_node('Odrive_Driver_Node', anonymous=True)
-    rate = rospy.Rate(20)
+    hz = rospy.get_param('~frequency', default = 50)
+    r = rospy.Rate(hz)
     # Calling Class
     Odrive = Odrive_Driver()
+
+    rospy.on_shutdown(Odrive.shutdown_hook)
+    signal.signal(signal.SIGINT, Odrive.signal_handler)
+    signal.signal(signal.SIGHUP, Odrive.signal_handler)
+    signal.signal(signal.SIGTERM, Odrive.signal_handler)
+    signal.signal(signal.SIGALRM, Odrive.signal_handler)
+    signal.signal(signal.SIGSYS, Odrive.signal_handler)
+
+
     while not rospy.is_shutdown():
         Odrive.driver_status()
-        rate.sleep()
+        r.sleep()
+    # Odrive.my_drive.axis0.controller.input_vel = 0
+    # Odrive.my_drive.axis1.controller.input_vel = 0
     rospy.spin()
 
 
