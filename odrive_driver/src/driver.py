@@ -27,6 +27,7 @@ class Odrive_Driver():
         self.status_pub = rospy.Publisher('driver/status', Status, queue_size= 10)
         self.counts = Channel_values()
         self.status = Status()
+        self.last_time = rospy.Time.now()
     def driver_status(self):
         """ Encoder ticks publishing"""
         self.counts.right = self.my_drive.axis0.encoder.shadow_count
@@ -39,9 +40,21 @@ class Odrive_Driver():
         self.status.battery_voltage = self.my_drive.vbus_voltage
         self.status_pub.publish(self.status)
     
+    def cmd_stop(self):
+        self.current_time = rospy.Time.now()
+        elapsed = self.current_time.to_sec() - self.last_time.to_sec()
+        if (elapsed > 1):
+            self.my_drive.axis0.controller.input_vel = 0
+            self.my_drive.axis1.controller.input_vel = 0    
+        
+
     def cmd_callback(self, msg):
+        self.last_time = rospy.Time.now()
+        
         self.my_drive.axis0.controller.input_vel = self.calculate_right_speed(msg.linear.x, msg.angular.z)   # turn/s
         self.my_drive.axis1.controller.input_vel = self.calculate_left_speed(msg.linear.x, msg.angular.z)    # turn/s
+        self.vel_axis_0 = self.calculate_right_speed(msg.linear.x, msg.angular.z)   # turn/s
+        self.vel_axis_1 = self.calculate_left_speed(msg.linear.x, msg.angular.z)    # turn/s
         
     def calculate_right_speed(self, x, z):
         speed = (2 * x + z * self.wheelbase) / (2 * self.radius * 2 * math.pi)
@@ -80,6 +93,8 @@ class Odrive_Driver():
 
     def clear_errors(self, command):
         self.my_drive.clear_errors()
+    
+
 
 if __name__ == '__main__':
     # Initialize Node 
@@ -99,6 +114,7 @@ if __name__ == '__main__':
 
     while not rospy.is_shutdown():
         Odrive.driver_status()
+        Odrive.cmd_stop()
         r.sleep()
     # Odrive.my_drive.axis0.controller.input_vel = 0
     # Odrive.my_drive.axis1.controller.input_vel = 0
