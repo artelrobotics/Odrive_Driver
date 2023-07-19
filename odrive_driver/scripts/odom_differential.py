@@ -12,7 +12,7 @@ class Odrive_Odometry():
     def __init__(self):
         self.publish_tf = rospy.get_param('~publish_tf', default = True)
         self.odom_frame = rospy.get_param('~odom_frame', default = 'odom')
-        self.base_frame = rospy.get_param('~base_link', default = 'leo_bot/base_link')
+        self.base_frame = rospy.get_param('~base_frame', default = 'base_link')
         self.odom_topic = rospy.get_param('~odom_topic', default = 'odometry')
         self.wheelbase = rospy.get_param('~wheelbase', default = 0.365)
         self.radius = rospy.get_param('~wheel_radius', default = 0.085)

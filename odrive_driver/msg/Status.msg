@@ -1,3 +1,12 @@
 float32 battery_voltage
-int32 right_error
-int32 left_error
+int32 system_error
+int32 right_axis_error
+int32 right_motor_error
+int32 right_sensorless_estimator_error
+int32 right_encoder_error
+int32 right_controller_error
+int32 left_axis_error
+int32 left_motor_error
+int32 left_sensorless_estimator_error
+int32 left_encoder_error
+int32 left_controller_error
